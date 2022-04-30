@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import plotly.graph_objects as go
 import numpy as np
@@ -19,23 +19,23 @@ class Pendulum:
                  length: float = 1.0,
                  initial_conditions: float = np.random.rand(1),
                  gravity: float = 9.81) -> None:
-        self.origin = origin
-        self.mass = mass
-        self.length = length
-        self.initial_conditions = map_range(
+        self.origin: Tuple[float, float] = origin
+        self.mass: float = mass
+        self.length: float = length
+        self.initial_conditions: float = map_range(
             initial_conditions, (0, 1), (-np.pi, np.pi))
-        self.gravity = gravity
-        self.time = 0.0
-        self.delta_t = 0.1
+        self.gravity: float = gravity
+        self.time: float = 0.0
+        self.delta_t: float = 0.1
+        self.history: List[Tuple[float, float]] = []
 
         # State variables
-        self.theta = self.initial_conditions
-        self.omega = 0.0
-        self.alpha = 0.0
+        self.theta: float = self.initial_conditions
+        self.omega: float = 0.0
+        self.alpha: float = 0.0
 
         # Derived variables
         self.x: float = self.origin[0] + self.length * np.sin(self.theta)
-
         self.y: float = self.origin[1] + self.length * np.cos(self.theta)
 
     def step(self) -> Tuple[float, float]:
@@ -68,30 +68,37 @@ class Pendulum:
             self.delta_t = dt
         for i in range(max_steps):
             self.step()
-            print("X:", self.x, "Y:", self.y)
-            if render:
-                self.render()
+            self.history.append((self.x, -self.y))
 
-    def render(self) -> None:
+        if render:
+            self.render(max_steps=max_steps)
+
+    def render(self, max_steps: int) -> None:
         """
         Render the simulation.
         """
         fig = go.Figure(
-            data=[go.Scatter(x=[0, 1], y=[0, 1])],
+            data=[go.Scatter(x=[0, 0], y=[0, -1])],
             layout=go.Layout(
-                xaxis=dict(range=[0, 5], autorange=False),
-                yaxis=dict(range=[0, 5], autorange=False),
+                xaxis=dict(range=[-3, 3], autorange=False),
+                yaxis=dict(range=[-3, 3], autorange=False),
                 title="Start Title",
                 updatemenus=[dict(
                     type="buttons",
                     buttons=[dict(label="Play",
                                   method="animate",
-                                  args=[None])])]
+                                  args=[None, {"frame": {"duration": 50,
+                                                         "redraw": False},
+                                               "fromcurrent": True,
+                                               "transition": {"duration": 0}}])])]
             ),
-            frames=[go.Frame(data=[go.Scatter(x=[1, 2], y=[1, 2])]),
-                    go.Frame(data=[go.Scatter(x=[1, 4], y=[1, 4])]),
-                    go.Frame(data=[go.Scatter(x=[3, 4], y=[3, 4])],
-                             layout=go.Layout(title_text="End Title"))]
+            frames=[go.Frame(data=[go.Scatter(x=[self.origin[0], *self.history[i][0]], y=[
+                             self.origin[1], *self.history[i][1]])]) for i in range(max_steps)]
+        )
+
+        fig.update_yaxes(
+            scaleanchor="x",
+            scaleratio=1,
         )
 
         fig.show()
@@ -100,7 +107,10 @@ class Pendulum:
 def main():
     pend = Pendulum()
 
-    pend.simulation()
+    pend.simulation(True, max_steps=1000, dt=0.01)
+    frames = [go.Frame(data=[go.Scatter(x=[pend.origin[0], *pend.history[i][0]], y=[
+        pend.origin[1], *pend.history[i][1]])]) for i in range(100)]
+    print(frames)
 
 
 if __name__ == "__main__":
